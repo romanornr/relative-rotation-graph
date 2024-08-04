@@ -10,6 +10,8 @@ library(TTR)
 
 # Define the calculate_rrg_metrics function
 calculate_rrg_metrics <- function(prices, benchmark, n = 63) {
+  cat("Entering calculate_rrg_metrics function\n")
+  
   # Ensure prices and benchmark are numeric vectors
   prices <- as.numeric(prices)
   benchmark <- as.numeric(benchmark)
@@ -17,6 +19,10 @@ calculate_rrg_metrics <- function(prices, benchmark, n = 63) {
   # Calculate returns
   returns <- diff(log(prices))
   bench_returns <- diff(log(benchmark))
+  
+  cat("Returns calculated:\n")
+  print(head(returns))
+  print(head(bench_returns))
   
   # Calculate relative strength
   rs <- cumprod(1 + (returns - bench_returns))
@@ -35,10 +41,16 @@ calculate_rrg_metrics <- function(prices, benchmark, n = 63) {
   rs_momentum <- (rs / lag(rs, n)) - 1
   rs_momentum <- rs_momentum * 100
   
+  cat("RS-Ratio and RS-Momentum calculated:\n")
+  print(head(rs_ratio))
+  print(head(rs_momentum))
+  
   # Remove NA values
   valid_rows <- complete.cases(rs_ratio, rs_momentum)
   rs_ratio <- rs_ratio[valid_rows]
   rs_momentum <- rs_momentum[valid_rows]
+  
+  cat("Valid rows after removing NAs:", sum(valid_rows), "\n")
   
   # Normalize RS-Ratio and RS-Momentum
   rs_ratio <- (rs_ratio - mean(rs_ratio, na.rm = TRUE)) / sd(rs_ratio, na.rm = TRUE)
@@ -48,9 +60,15 @@ calculate_rrg_metrics <- function(prices, benchmark, n = 63) {
   rs_ratio <- pmin(pmax(rs_ratio * 20, -100), 100)
   rs_momentum <- pmin(pmax(rs_momentum * 20, -100), 100)
   
+  cat("Normalized and scaled RS-Ratio and RS-Momentum:\n")
+  print(head(rs_ratio))
+  print(head(rs_momentum))
+  
   # Combine results
-  result <- data.frame(rs_ratio = rs_ratio,
-                       rs_momentum = rs_momentum)
+  result <- data.frame(rs_ratio = rs_ratio, rs_momentum = rs_momentum)
+  
+  cat("Final result dataset:\n")
+  print(head(result))
   
   return(result)
 }
@@ -149,10 +167,8 @@ if (!is.null(rrg_df) && nrow(rrg_df) > 0) {
   # Plotting
   rrg_df$symbol <- as.factor(rrg_df$symbol)
 
-  # Use smoother lines and adjust arrow types
   p <- ggplot(rrg_df, aes(x = rs_ratio, y = rs_momentum, color = symbol)) +
-    geom_smooth(method = "loess", se = FALSE, size = 0.8) +  # Smooth lines with loess
-    geom_path(arrow = arrow(length = unit(0.15, "inches"), type = "closed"), size = 0.8) +
+    geom_path(arrow = arrow(length = unit(0.1, "inches"), type = "closed"), linewidth = 0.8) +  # Adjust line width
     geom_point(data = rrg_df %>% group_by(symbol) %>% slice_tail(n = 1), shape = 21, size = 4, fill = "white") +
     geom_point(data = rrg_df %>% group_by(symbol) %>% slice_head(n = 1), shape = 24, size = 3, fill = "black") +
     geom_text_repel(data = rrg_df %>% group_by(symbol) %>% slice_tail(n = 1), 
@@ -169,11 +185,11 @@ if (!is.null(rrg_df) && nrow(rrg_df) > 0) {
     coord_cartesian(xlim = c(-60, 60), ylim = c(-60, 60))  # Adjusted axis limits for better spacing
   
   p <- p +
-    annotate("text", x = 15, y = 15, label = "Leading", fontface = "bold") +
-    annotate("text", x = -15, y = 15, label = "Improving", fontface = "bold") +
-    annotate("text", x = -15, y = -15, label = "Lagging", fontface = "bold") +
-    annotate("text", x = 15, y = -15, label = "Weakening", fontface = "bold")
-
+    annotate("text", x = 30, y = 30, label = "Leading", fontface = "bold") +
+    annotate("text", x = -30, y = 30, label = "Improving", fontface = "bold") +
+    annotate("text", x = -30, y = -30, label = "Lagging", fontface = "bold") +
+    annotate("text", x = 30, y = -30, label = "Weakening", fontface = "bold")
+  
   print(p)
 } else {
   cat("No valid RRG data available for plotting.\n")
