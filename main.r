@@ -71,7 +71,7 @@ for (sym in c(symbols, benchmark)) {
 
 # Prepare data (as before)
 end_date <- Sys.Date()
-start_date <- end_date - 365
+start_date <- end_date - 150
 
 # Create an empty xts object to store prices
 prices <- do.call(merge, lapply(symbols, function(sym) {
@@ -151,7 +151,8 @@ if (!is.null(rrg_df) && nrow(rrg_df) > 0) {
 
   # Use smoother lines and adjust arrow types
   p <- ggplot(rrg_df, aes(x = rs_ratio, y = rs_momentum, color = symbol)) +
-    geom_path(arrow = arrow(length = unit(0.1, "inches"), type = "closed"), linewidth = 0.8) +  # Adjust line width
+    geom_smooth(method = "loess", se = FALSE, size = 0.8) +  # Smooth lines with loess
+    geom_path(arrow = arrow(length = unit(0.15, "inches"), type = "closed"), size = 0.8) +
     geom_point(data = rrg_df %>% group_by(symbol) %>% slice_tail(n = 1), shape = 21, size = 4, fill = "white") +
     geom_point(data = rrg_df %>% group_by(symbol) %>% slice_head(n = 1), shape = 24, size = 3, fill = "black") +
     geom_text_repel(data = rrg_df %>% group_by(symbol) %>% slice_tail(n = 1), 
@@ -165,14 +166,14 @@ if (!is.null(rrg_df) && nrow(rrg_df) > 0) {
          y = "JdK RS-Momentum") +
     theme_minimal() +
     theme(legend.position = "bottom") +
-    coord_cartesian(xlim = c(-40, 40), ylim = c(-40, 40))  # Adjusted axis limits for better spacing
+    coord_cartesian(xlim = c(-60, 60), ylim = c(-60, 60))  # Adjusted axis limits for better spacing
   
   p <- p +
-    annotate("text", x = 12, y = 12, label = "Leading", fontface = "bold") +
-    annotate("text", x = -12, y = 12, label = "Improving", fontface = "bold") +
-    annotate("text", x = -12, y = -12, label = "Lagging", fontface = "bold") +
-    annotate("text", x = 12, y = -12, label = "Weakening", fontface = "bold")
-  
+    annotate("text", x = 15, y = 15, label = "Leading", fontface = "bold") +
+    annotate("text", x = -15, y = 15, label = "Improving", fontface = "bold") +
+    annotate("text", x = -15, y = -15, label = "Lagging", fontface = "bold") +
+    annotate("text", x = 15, y = -15, label = "Weakening", fontface = "bold")
+
   print(p)
 } else {
   cat("No valid RRG data available for plotting.\n")
