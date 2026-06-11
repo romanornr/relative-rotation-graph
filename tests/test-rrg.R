@@ -59,6 +59,16 @@ check("rrg() errors on insufficient history",
       inherits(tryCatch(rrg(px[1:20, ], benchmark = "BENCH"),
                         error = function(e) e),
                "error"))
+check("rrg() rejects malformed tuning parameters",
+      all(vapply(list(list(smooth = 10.5), list(smooth = Inf),
+                      list(smooth = NA), list(window = c(14, 20)),
+                      list(roc_period = 0), list(trail_len = "10")),
+                 function(bad) {
+                   args <- c(list(px, benchmark = "BENCH"), bad)
+                   inherits(tryCatch(do.call(rrg, args),
+                                     error = function(e) e),
+                            "error")
+                 }, logical(1))))
 
 # ---- Quadrant semantics ------------------------------------------------------
 
