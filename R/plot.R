@@ -46,6 +46,10 @@ rrg_plot <- function(x) {
                     fontface = "bold", size = 4, show.legend = FALSE,
                     box.padding = 0.6, point.padding = 0.4) +
     scale_color_brewer(palette = "Set1") +
+    # Default breaks step by 2 across this narrow a range, which leaves only
+    # three labeled gridlines inside the clipped window; ask for finer ticks
+    scale_x_continuous(n.breaks = 8) +
+    scale_y_continuous(n.breaks = 8) +
     coord_equal(xlim = 100 + c(-lim, lim), ylim = 100 + c(-lim, lim),
                 expand = FALSE) +
     labs(title = "Relative Rotation Graph",
