@@ -7,10 +7,13 @@ The exact JdK formulas are proprietary, so this uses the standard public
 approximation:
 
 - `RS = 100 * price / benchmark`
-- `RS-Ratio = 100 + rolling z-score of RS`
-- `RS-Momentum = 100 + rolling z-score of ROC(RS-Ratio)`
+- `RS-Ratio = 100 + rolling z-score of WMA(RS, smooth)`
+- `RS-Momentum = 100 + rolling z-score of WMA(ROC(RS-Ratio), smooth)`
 
-All normalization uses trailing windows only (no lookahead), so each point on a
+The `smooth` WMA pass is a trailing trend filter that mimics the smoothing in
+the licensed JdK indicators (the ones on Bloomberg terminals); it is what makes
+trails arc instead of zigzag. Set `smooth = 1` to disable it. All filtering and
+normalization uses trailing windows only (no lookahead), so each point on a
 trail is what you would have seen in real time. Quadrants are centered at
 (100, 100): Leading, Weakening, Lagging, Improving.
 
@@ -46,8 +49,12 @@ print(g)                              # current quadrant per symbol
 plot(g)                               # draw the chart
 ```
 
-`rrg()` is frequency-agnostic — `window`, `roc_period`, and `trail_len`
-(defaults 14 / 4 / 10) are in bars of whatever frequency the input carries.
+`rrg()` is frequency-agnostic — `window`, `roc_period`, `trail_len`, and
+`smooth` (defaults 14 / 4 / 10 / 1) are in bars of whatever frequency the input
+carries. More smoothing means rounder trails but later signals: the filter
+delays quadrant crossings, which is also true of the licensed indicator
+(StockCharts documents roughly ten weeks between a relative-strength peak and
+the RS-Ratio centerline cross).
 
 ## Requirements
 

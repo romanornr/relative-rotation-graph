@@ -101,6 +101,37 @@ check("RS-Momentum crosses below 100 before RS-Ratio (clockwise rotation)",
       !is.na(ratio_cross) && !is.na(mom_cross) &&
         mom_cross < ratio_cross && (ratio_cross - mom_cross) < 26)
 
+# ---- Smoothing -----------------------------------------------------------------
+# The WMA trend filter must reduce trail jerkiness, must not introduce
+# lookahead, and smooth = 1 must be a no-op.
+
+set.seed(42)
+noisy <- bench * (1 + 0.05 * sin(2 * pi * seq_len(n) / 52) + rnorm(n, sd = 0.02))
+px_noisy <- xts::xts(cbind(NOISY = noisy, BENCH = bench), order.by = dates)
+
+jerk <- function(v) mean(abs(diff(diff(v))), na.rm = TRUE)
+m_raw <- calc_rrg_metrics(px_noisy[, "NOISY"], px_noisy[, "BENCH"],
+                          window = 14, roc_period = 4)
+m_smooth <- calc_rrg_metrics(px_noisy[, "NOISY"], px_noisy[, "BENCH"],
+                             window = 14, roc_period = 4, smooth = 10)
+check("smoothing reduces RS-Ratio trail jerkiness",
+      jerk(as.numeric(m_smooth$rs_ratio)) < jerk(as.numeric(m_raw$rs_ratio)))
+check("smoothing reduces RS-Momentum trail jerkiness",
+      jerk(as.numeric(m_smooth$rs_momentum)) < jerk(as.numeric(m_raw$rs_momentum)))
+
+check("smooth = 1 is the default and a no-op",
+      isTRUE(all.equal(
+        zoo::coredata(calc_rrg_metrics(px[, "CYC"], px[, "BENCH"],
+                                       window = 14, roc_period = 4, smooth = 1)),
+        zoo::coredata(m_full))))
+
+check("smoothed metrics at bar t never change as later data arrives",
+      all(vapply(c(120, 160), function(k) {
+        m_part <- calc_rrg_metrics(px_noisy[1:k, "NOISY"], px_noisy[1:k, "BENCH"],
+                                   window = 14, roc_period = 4, smooth = 10)
+        isTRUE(all.equal(zoo::coredata(m_smooth[1:k, ]), zoo::coredata(m_part)))
+      }, logical(1))))
+
 # ---- Degenerate inputs ---------------------------------------------------------
 # A symbol that tracks the benchmark exactly has zero variance in its RS line;
 # the z-score denominator is 0 and must yield NA, never Inf or NaN.

@@ -18,18 +18,28 @@ rolling_zscore <- function(x, window) {
   z
 }
 
+# Trailing weighted moving average (linear weights, most recent bar heaviest).
+# n = 1 is the identity, so unsmoothed and smoothed share one code path.
+wma <- function(x, n) {
+  if (n <= 1) return(x)
+  TTR::WMA(x, n)
+}
+
 # Pure function: two aligned price series in, xts of (rs_ratio, rs_momentum) out.
-calc_rrg_metrics <- function(price, bench, window, roc_period) {
+# `smooth` low-pass filters the RS line (and the momentum input) with a
+# trailing WMA before normalization, mimicking the trend-following filter in
+# the licensed JdK indicators. Higher = smoother trails, more lag.
+calc_rrg_metrics <- function(price, bench, window, roc_period, smooth = 1) {
   rs <- 100 * price / bench
 
-  # Where the relative-strength line sits within its recent range, in trailing
-  # standard deviations, centered at 100
-  rs_ratio <- 100 + rolling_zscore(rs, window)
+  # Where the (filtered) relative-strength line sits within its recent range,
+  # in trailing standard deviations, centered at 100
+  rs_ratio <- 100 + rolling_zscore(wma(rs, smooth), window)
 
   # Rate of change of RS-Ratio (its derivative drives the clockwise rotation),
-  # normalized the same way
+  # filtered and normalized the same way
   roc <- 100 * (rs_ratio / xts::lag.xts(rs_ratio, roc_period) - 1)
-  rs_momentum <- 100 + rolling_zscore(roc, window)
+  rs_momentum <- 100 + rolling_zscore(wma(roc, smooth), window)
 
   out <- merge(rs_ratio, rs_momentum)
   colnames(out) <- c("rs_ratio", "rs_momentum")
@@ -46,8 +56,10 @@ quadrant <- function(rs_ratio, rs_momentum) {
 # Construct an RRG from a wide xts of prices. `benchmark` names the benchmark
 # column; every other column becomes a trail. Returns an object of class "rrg"
 # holding the trails and the parameters that produced them.
-rrg <- function(prices, benchmark, window = 14, roc_period = 4, trail_len = 10) {
-  stopifnot(xts::is.xts(prices), window >= 2, roc_period >= 1, trail_len >= 1)
+rrg <- function(prices, benchmark, window = 14, roc_period = 4, trail_len = 10,
+                smooth = 1) {
+  stopifnot(xts::is.xts(prices), window >= 2, roc_period >= 1, trail_len >= 1,
+            smooth >= 1)
   if (!benchmark %in% colnames(prices)) {
     stop("Benchmark column '", benchmark, "' not found in prices.")
   }
@@ -57,15 +69,17 @@ rrg <- function(prices, benchmark, window = 14, roc_period = 4, trail_len = 10) 
   }
 
   # rs_ratio needs `window` bars, its ROC another `roc_period`, the momentum
-  # z-score another `window`, and the trail sits on top of that
-  min_rows <- 2L * window + roc_period + trail_len
+  # z-score another `window`, each WMA pass adds `smooth - 1`, and the trail
+  # sits on top of that
+  min_rows <- 2L * window + roc_period + trail_len + 2L * (smooth - 1L)
   if (nrow(prices) < min_rows) {
-    stop(sprintf("Need at least %d rows for window=%d, roc_period=%d, trail_len=%d; got %d.",
-                 min_rows, window, roc_period, trail_len, nrow(prices)))
+    stop(sprintf("Need at least %d rows for window=%d, roc_period=%d, trail_len=%d, smooth=%d; got %d.",
+                 min_rows, window, roc_period, trail_len, smooth, nrow(prices)))
   }
 
   trails <- do.call(rbind, lapply(symbols, function(sym) {
-    m <- calc_rrg_metrics(prices[, sym], prices[, benchmark], window, roc_period)
+    m <- calc_rrg_metrics(prices[, sym], prices[, benchmark], window, roc_period,
+                          smooth)
     m <- utils::tail(stats::na.omit(m), trail_len)
     if (nrow(m) == 0) return(NULL)
     data.frame(date = zoo::index(m), symbol = sym, zoo::coredata(m),
@@ -79,7 +93,7 @@ rrg <- function(prices, benchmark, window = 14, roc_period = 4, trail_len = 10) 
     list(trails = trails,
          benchmark = benchmark,
          params = list(window = window, roc_period = roc_period,
-                       trail_len = trail_len)),
+                       trail_len = trail_len, smooth = smooth)),
     class = "rrg"
   )
 }
@@ -97,8 +111,9 @@ print.rrg <- function(x, ...) {
   h <- rrg_heads(x)
   cat(sprintf("Relative Rotation Graph vs %s — as of %s\n",
               x$benchmark, max(x$trails$date)))
-  cat(sprintf("window = %d, roc_period = %d, trail = %d bars\n\n",
-              x$params$window, x$params$roc_period, x$params$trail_len))
+  cat(sprintf("window = %d, roc_period = %d, smooth = %d, trail = %d bars\n\n",
+              x$params$window, x$params$roc_period, x$params$smooth,
+              x$params$trail_len))
   h$rs_ratio <- round(h$rs_ratio, 2)
   h$rs_momentum <- round(h$rs_momentum, 2)
   print(h[, c("symbol", "rs_ratio", "rs_momentum", "quadrant")],
