@@ -18,10 +18,22 @@ rolling_zscore <- function(x, window) {
   z
 }
 
+# Validate a tuning parameter as a single finite whole number >= min and
+# return it as integer, failing fast with a clear message instead of erroring
+# deep inside TTR or producing a nonsensical row requirement.
+as_count <- function(x, min, name) {
+  if (length(x) != 1 || !is.numeric(x) || !is.finite(x) || x %% 1 != 0 ||
+      x < min) {
+    stop("`", name, "` must be a single whole number >= ", min, ".")
+  }
+  as.integer(x)
+}
+
 # Trailing weighted moving average (linear weights, most recent bar heaviest).
 # n = 1 is the identity, so unsmoothed and smoothed share one code path.
 wma <- function(x, n) {
-  if (n <= 1) return(x)
+  n <- as_count(n, 1L, "smooth")
+  if (n == 1L) return(x)
   TTR::WMA(x, n)
 }
 
@@ -58,8 +70,11 @@ quadrant <- function(rs_ratio, rs_momentum) {
 # holding the trails and the parameters that produced them.
 rrg <- function(prices, benchmark, window = 14, roc_period = 4, trail_len = 10,
                 smooth = 1) {
-  stopifnot(xts::is.xts(prices), window >= 2, roc_period >= 1, trail_len >= 1,
-            smooth >= 1)
+  stopifnot(xts::is.xts(prices))
+  window <- as_count(window, 2L, "window")
+  roc_period <- as_count(roc_period, 1L, "roc_period")
+  trail_len <- as_count(trail_len, 1L, "trail_len")
+  smooth <- as_count(smooth, 1L, "smooth")
   if (!benchmark %in% colnames(prices)) {
     stop("Benchmark column '", benchmark, "' not found in prices.")
   }
