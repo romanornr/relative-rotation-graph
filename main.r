@@ -18,6 +18,7 @@ config <- list(
   window     = 14,  # rolling normalization window, in weekly bars
   roc_period = 4,   # RS-Ratio momentum lookback, in weekly bars
   trail_len  = 10,  # weekly observations shown per trail
+  smooth     = 10,  # WMA trend filter on RS and momentum (1 = off)
   years_back = 2,   # history to download
   output     = "rrg.png"
 )
@@ -33,7 +34,8 @@ g <- rrg(prices,
          benchmark  = config$benchmark,
          window     = config$window,
          roc_period = config$roc_period,
-         trail_len  = config$trail_len)
+         trail_len  = config$trail_len,
+         smooth     = config$smooth)
 
 print(g)
 
